@@ -189,6 +189,7 @@ def choose_api() -> str:
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
     openai_key = os.environ.get("OPENAI_API_KEY")
     gemini_key = os.environ.get("GEMINI_API_KEY")
+    print(gemini_key)
 
     available_apis = []
     if anthropic_key:
