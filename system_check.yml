@@ -1,0 +1,40 @@
+---
+- name: System Check
+  hosts: all
+  tasks:
+    - name: Count open SSH connections
+      shell: ps aux | grep sshd | grep -v priv | grep -v ansible | wc -l
+      register: ssh_connections
+
+    - name: Check nginx service status
+      systemd:
+        name: nginx
+        state: started
+      register: nginx_status
+
+    - name: Get Ubuntu version
+      shell: lsb_release -a
+      register: ubuntu_version
+
+    - name: Check security messages
+      shell: grep -i security /var/log/syslog | tail -n 20
+      register: security_messages
+      become: yes
+
+    - name: Check disk usage
+      shell: df -h
+      register: disk_usage
+
+    - name: Check memory usage
+      shell: free -h
+      register: memory_usage
+
+    - name: Display results
+      debug:
+        msg:
+          - "Open SSH connections: {{ ssh_connections.stdout }}"
+          - "Nginx status: {{ nginx_status.status.ActiveState }}"
+          - "Ubuntu version: {{ ubuntu_version.stdout_lines }}"
+          - "Security messages: {{ security_messages.stdout_lines }}"
+          - "Disk usage: {{ disk_usage.stdout_lines }}"
+          - "Memory usage: {{ memory_usage.stdout_lines }}"

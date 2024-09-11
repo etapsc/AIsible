@@ -39,7 +39,8 @@ def parse_ansible_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run Ansible ad-hoc command and analyze output with LLM.")
     parser.add_argument('pattern', help="Host pattern")
     parser.add_argument('-i', '--inventory', required=True, help="Specify inventory file path")
-    parser.add_argument('-m', '--module', default='command', help="Module name to execute")
+    parser.add_argument('-m', '--module', help="Module name to execute")
+    parser.add_argument('-p', '--playbook', help="Playbook to execute")
     parser.add_argument('-a', '--args', help="Module arguments")
     parser.add_argument('-u', '--user', help="Connect as this user")
     parser.add_argument('-b', '--become', action='store_true', help="Run operations with become")
@@ -66,7 +67,20 @@ def run_ansible_command(args: argparse.Namespace) -> str:
     else:
         inventory = get_absolute_path(args.inventory)
 
-    print(f"Executing Ansible command with module '{args.module}' and args '{args.args}'", file=sys.stderr)
+    if args.module is None and args.playbook is None:
+        print("Error: Either module or playbook must be specified", file=sys.stderr)
+        sys.exit(1)
+    if args.module and args.playbook:
+        print("Error: Only one of module or playbook can be specified", file=sys.stderr)
+        sys.exit(1)
+
+    playbook = None
+    if args.module:
+        print(f"Executing Ansible command with module '{args.module}' and args '{args.args}'", file=sys.stderr)
+    else:
+        playbook = get_absolute_path(args.playbook)
+        print(f"Executing Ansible playbook '{playbook}'", file=sys.stderr)
+
     print(f"Inventory file: {inventory}", file=sys.stderr)
     print(f"Host pattern: {args.pattern}", file=sys.stderr)
     start_time = time.time()
@@ -82,7 +96,7 @@ def run_ansible_command(args: argparse.Namespace) -> str:
     runner = ansible_runner.run(
         private_data_dir='/tmp',
         inventory=inventory,
-        playbook=None,
+        playbook=playbook,
         module=args.module,
         module_args=args.args,
         host_pattern=args.pattern,
@@ -114,7 +128,7 @@ def run_ansible_command(args: argparse.Namespace) -> str:
     return '\n'.join(all_output)
 
 
-def prepare_llm_input(ansible_command: str, ansible_output: str, config: configparser.ConfigParser) -> dict:
+def prepare_llm_input(ansible_command: str, playbook_content: str, ansible_output: str, config: configparser.ConfigParser) -> dict:
     if 'prompts' in config and 'system_message' in config['prompts'] and config['prompts']['system_message']:
         system_message = config['prompts']['system_message']
     else:
@@ -124,7 +138,9 @@ def prepare_llm_input(ansible_command: str, ansible_output: str, config: configp
     else:
         user_message_template = default_user_message_template
 
-    system_message = system_message
+    if playbook_content:
+        ansible_command = f"{ansible_command}\n\nAnsible Playbook:\n{playbook_content}"
+
     user_message = user_message_template.format(
         ansible_command=ansible_command,
         ansible_output=ansible_output
@@ -223,13 +239,22 @@ def main():
         sys.exit(1)
 
     ansible_output = run_ansible_command(args)
+    if not ansible_output:
+        print("No output from Ansible command", file=sys.stderr)
+        exit(0)
 
     # print("Ansible Output:", file=sys.stderr)
     # print(ansible_output, file=sys.stderr)
 
-    ansible_command = f"ansible {args.pattern} -i {args.inventory} -m {args.module}"
-    if args.args:
-        ansible_command += f" -a '{args.args}'"
+    playbook_content = None
+    if args.playbook:
+        with open(args.playbook, 'r') as f:
+            playbook_content = f.read()
+        ansible_command = f"ansible-playbook {args.pattern} -i {args.inventory} {args.playbook}"
+    else:
+        ansible_command = f"ansible {args.pattern} -i {args.inventory} -m {args.module}"
+        if args.args:
+            ansible_command += f" -a '{args.args}'"
     if args.user:
         ansible_command += f" -u {args.user}"
     if args.become:
@@ -237,7 +262,8 @@ def main():
     if args.ask_become_pass:
         ansible_command += " -K"
 
-    llm_input = prepare_llm_input(ansible_command, ansible_output, config)
+
+    llm_input = prepare_llm_input(ansible_command, playbook_content, ansible_output, config)
     # print("\nLLM Input:")
     # print(llm_input)
 

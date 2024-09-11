@@ -10,11 +10,11 @@ setup(
     name="aisible",
     version="0.1.0",
     author="Your Name",
-    author_email="your.email@example.com",
+    author_email="ak@etapiscium.com",
     description="A tool to run Ansible commands and analyze output with LLMs",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/aisible",
+    url="https://github.com/etapsc/AIsible",
     packages=find_packages(),
     install_requires=requirements,
     classifiers=[
