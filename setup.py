@@ -8,8 +8,8 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name="aisible",
-    version="0.1.0",
-    author="Your Name",
+    version="0.2.0",
+    author="Kullat Nunu",
     author_email="ak@etapiscium.com",
     description="A tool to run Ansible commands and analyze output with LLMs",
     long_description=long_description,
